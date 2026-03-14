@@ -45,27 +45,27 @@
       <div class="lg:col-span-7 bg-white p-6 rounded-lg shadow border border-gray-200 flex flex-col">
         <h2 class="text-2xl font-bold mb-4 text-gray-700 text-center">壓力隨時間的變化</h2>
         
-        <div class="relative w-full flex-grow min-h-[350px] mb-8">
+        <div class="relative w-full flex-grow min-h-[480px] mb-4">
           <canvas id="pressureChart"></canvas>
         </div>
 
-        <div class="w-full bg-gray-50 p-5 rounded-xl border border-gray-200 shadow-inner space-y-5">
-          <div class="flex items-center justify-center space-x-6">
-            <button id="playBtn" class="flex items-center justify-center w-16 h-16 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition shadow-md text-2xl pb-1">
+        <div class="w-full bg-gray-50 p-3 rounded-xl border border-gray-200 shadow-inner space-y-3">
+          <div class="flex items-center justify-center space-x-4">
+            <button id="playBtn" title="按空白鍵 (Space) 播放/暫停" class="flex items-center justify-center w-12 h-12 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition shadow-md text-xl pb-1">
               ⏸
             </button>
-            <button id="resetBtn" class="flex items-center justify-center w-12 h-12 bg-gray-300 text-gray-700 rounded-full hover:bg-gray-400 transition shadow-md text-xl pb-1">
+            <button id="resetBtn" title="重設" class="flex items-center justify-center w-10 h-10 bg-gray-300 text-gray-700 rounded-full hover:bg-gray-400 transition shadow-md text-lg pb-1">
               ↺
             </button>
           </div>
           
           <div class="w-full px-4">
-            <div class="flex justify-between text-sm text-gray-600 font-bold mb-2">
+            <div class="flex justify-between text-sm text-gray-600 font-bold mb-1">
               <span>0秒</span>
-              <span id="timeDisplay" class="text-lg text-blue-800">時間：0.00秒</span>
+              <span id="timeDisplay" class="text-base text-blue-800">時間：0.00秒</span>
               <span>4秒</span>
             </div>
-            <input id="timeSlider" type="range" min="0" max="4" step="0.01" value="0" class="w-full h-3 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-600" />
+            <input id="timeSlider" type="range" min="0" max="4" step="0.01" value="0" class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-600" />
           </div>
         </div>
       </div>
@@ -150,7 +150,7 @@
           ctx.beginPath();
           ctx.moveTo(xPixel, yAxis.top);
           ctx.lineTo(xPixel, yAxis.bottom);
-          ctx.lineWidth = 4; // Made the playhead line thicker
+          ctx.lineWidth = 4;
           ctx.strokeStyle = '#f59e0b';
           ctx.stroke();
           ctx.restore();
@@ -160,7 +160,6 @@
 
     const ctx = document.getElementById('pressureChart').getContext('2d');
     
-    // Increased chart font sizes for classroom viewing
     Chart.defaults.font.size = 14;
 
     const chart = new Chart(ctx, {
@@ -172,7 +171,7 @@
             label: '肺泡壓力 (Alveolar Pressure)',
             data: alveolarData,
             borderColor: '#10b981',
-            borderWidth: 4, // Thicker lines
+            borderWidth: 4,
             pointRadius: 0,
             tension: 0.4
           },
@@ -180,7 +179,7 @@
             label: '胸膜腔內壓 (Intrapleural Pressure)',
             data: intrapleuralData,
             borderColor: '#8b5cf6',
-            borderWidth: 4, // Thicker lines
+            borderWidth: 4,
             pointRadius: 0,
             tension: 0.4
           }
@@ -312,6 +311,15 @@
       playBtn.innerText = '▶';
       cancelAnimationFrame(animationId);
       updateSimulation();
+    });
+
+    // Spacebar shortcut to play/pause
+    document.addEventListener('keydown', (e) => {
+      // Check if spacebar is pressed and we are not focused on an input field
+      if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
+        e.preventDefault(); // Prevents the browser from scrolling down
+        playBtn.click(); // Triggers the play/pause button logic
+      }
     });
 
     lastUpdate = performance.now();
