@@ -191,6 +191,11 @@
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
+        // NEW INTERACTION SETTINGS HERE
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
         scales: {
           x: {
             type: 'linear', min: 0, max: 4,
@@ -390,6 +395,6 @@
     animationId = requestAnimationFrame(animate);
 
   </script>
-  <button onclick="window.location.href='index.html'" style="position:fixed; top:10px; left:10px; z-index:1000;">⬅ 返回實驗室</button>
+  <button onclick="window.location.href='index.html'" style="position:fixed; top:10px; left:10px; z-index:1000;" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded shadow">⬅ 返回實驗室</button>
 </body>
 </html>
