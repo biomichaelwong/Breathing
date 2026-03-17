@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stomata Simulator (Wider View & Larger Text)</title>
+    <style>
+        :root {
+            /* Theme Colors */
+            --bg-day: #e0f7fa; --bg-night: #1c262b;
+            --text-day: #2c3e50; --text-night: #eceff1;
+            --panel-day: #ffffff; --panel-night: #2d373c;
+            
+            /* Cell Colors */
+            --epidermal-day: #aed581; --epidermal-night: #7cb342;
+            --epidermal-stroke: #558b2f;
+            --guard-day: #8bc34a; --guard-night: #558b2f;
+            --vacuole-day: #81d4fa; --vacuole-night: #b3e5fc;
+            --chloroplast: #2e7d32; --thick-wall: #1b5e20;
+            --water-color: #29b6f6;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            margin: 0; padding: 0;
+            background-color: var(--bg-day);
+            color: var(--text-day);
+            transition: background-color 0.8s ease, color 0.8s ease;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh;
+        }
+
+        body.night { background-color: var(--bg-night); color: var(--text-night); }
+
+        header { text-align: center; padding: 25px 20px 10px; width: 100%; }
+        header p { opacity: 0.8; font-size: 0.95rem; margin-top: 5px; }
+
+        .controls {
+            display: flex; gap: 15px; margin-bottom: 25px;
+        }
+
+        button {
+            padding: 12px 24px; font-size: 15px; cursor: pointer;
+            border: none; border-radius: 8px; font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            opacity: 0.6;
+        }
+
+        button.active { opacity: 1; transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.2); }
+        .btn-day { background-color: #ffd54f; color: #3e2723; }
+        .btn-night { background-color: #3949ab; color: #ffffff; }
+        
+        button.active.btn-day { box-shadow: 0 0 15px rgba(255, 213, 79, 0.5); }
+        button.active.btn-night { box-shadow: 0 0 15px rgba(57, 73, 171, 0.5); }
+
+        .container {
+            display: flex; flex-wrap: wrap; gap: 30px;
+            max-width: 1400px; width: 95%;
+            justify-content: center; align-items: stretch;
+            margin-bottom: 40px;
+        }
+
+        .panel {
+            background-color: var(--panel-day);
+            padding: 25px; border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            transition: background-color 0.8s ease, box-shadow 0.8s ease;
+            flex: 1; min-width: 380px;
+            display: flex; flex-direction: column; justify-content: center;
+        }
+
+        body.night .panel { background-color: var(--panel-night); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+
+        .simulation-area { align-items: center; position: relative; }
+        svg { width: 100%; max-width: 700px; height: auto; overflow: visible; }
+
+        .guard-cell, .vacuole, .inner-wall, .epidermal-cell, .organelle, .stoma-pore {
+            will-change: d, transform, fill;
+            transition: d 12.3s ease-in-out, 
+                        fill 12.3s ease-in-out, 
+                        transform 12.3s ease-in-out;
+        }
+
+        .organelle { transform-origin: 0 0; }
+
+        .dynamic-label {
+            stroke: #000000;
+            opacity: 1; 
+        }
+
+        .svg-label {
+            /* Increased font size by roughly 1 point */
+            font-size: 13px;
+            font-weight: 700;
+            fill: var(--text-day);
+            text-shadow: 1.5px 1.5px 0px rgba(255,255,255,0.8), -1px -1px 0px rgba(255,255,255,0.8);
+            transition: fill 0.8s ease, text-shadow 0.8s ease;
+        }
+        body.night .svg-label {
+            fill: var(--text-night);
+            text-shadow: 1.5px 1.5px 0px rgba(0,0,0,0.8), -1px -1px 0px rgba(0,0,0,0.8);
+        }
+
+        /* Increased font sizes for the explanation side */
+        .explanation h3 { margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 12px; font-size: 1.35rem; }
+        body.night .explanation h3 { border-color: #455a64; }
+
+        .step { margin-bottom: 12px; padding-left: 16px; border-left: 3px solid #ccc; line-height: 1.5; font-size: 1.1rem; }
+        body.day .step { border-left-color: #ffd54f; }
+        body.night .step { border-left-color: #5c6bc0; }
+        
+        .highlight { font-weight: 700; color: #d32f2f; }
+        body.night .highlight { color: #ff8a80; }
+        
+        /* Gauges */
+        .gauges-wrapper {
+            margin-top: auto; padding-top: 20px;
+            border-top: 1px solid #eee;
+            display: flex; flex-direction: column; gap: 15px;
+        }
+        body.night .gauges-wrapper { border-top-color: #455a64; }
+        
+        .gauge-label { display: flex; justify-content: space-between; font-weight: 600; font-size: 1.05rem; margin-bottom: 6px; }
+        
+        .gauge-bar-bg {
+            width: 100%; height: 18px;
+            background-color: #e0e0e0; border-radius: 10px;
+            overflow: hidden; position: relative;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.15);
+        }
+        body.night .gauge-bar-bg { background-color: #1c262b; box-shadow: inset 0 2px 5px rgba(0,0,0,0.5); }
+
+        .turgor-fill {
+            height: 100%; width: 100%; border-radius: 10px; transition: width 0.1s linear;
+            background: linear-gradient(90deg, #f44336 0%, #ffeb3b 40%, #4caf50 80%, #0288d1 100%);
+        }
+        .aperture-fill {
+            height: 100%; width: 100%; border-radius: 10px; transition: width 0.1s linear;
+            background: linear-gradient(90deg, #9e9e9e 0%, #ba68c8 40%, #ab47bc 80%, #7b1fa2 100%);
+        }
+
+        .water-legend {
+            display: inline-flex; align-items: center; gap: 8px;
+            margin-top: 10px; margin-bottom: 10px; font-weight: 600; font-size: 1.05rem; color: #0277bd;
+            background: rgba(41, 182, 246, 0.1); padding: 6px 12px; border-radius: 20px;
+        }
+        body.night .water-legend { color: #81d4fa; background: rgba(129, 212, 250, 0.1); }
+        
+        .water-dot { 
+            width: 10px; height: 10px; 
+            background-color: var(--water-color); border-radius: 50%; 
+            display: inline-block;
+            border: 2px solid #01579b;
+            box-shadow: 0 0 4px rgba(1, 87, 155, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Stomatal Dynamics Simulator</h1>
+        <p>Real-Time Structure Tracking (HKDSE Standard)</p>
+    </header>
+
+    <div class="controls">
+        <button id="btn-day" class="btn-day active" onclick="setMode('day')">☀️ Day (Light)</button>
+        <button id="btn-night" class="btn-night" onclick="setMode('night')">🌙 Night (Dark)</button>
+    </div>
+
+    <div class="container">
+        <div class="panel simulation-area">
+            <svg viewBox="-120 -60 640 520" id="stomaSvg">
+                <defs>
+                    <g id="chloroplast-def">
+                        <rect x="-10" y="-5" width="20" height="10" rx="5" fill="var(--chloroplast)"/>
+                        <line x1="-5" y1="-3" x2="-5" y2="3" stroke="var(--epidermal-day)" stroke-width="1.5"/>
+                        <line x1="-1" y1="-3" x2="-1" y2="3" stroke="var(--epidermal-day)" stroke-width="1.5"/>
+                        <line x1="3" y1="-3" x2="3" y2="3" stroke="var(--epidermal-day)" stroke-width="1.5"/>
+                        <line x1="-6" y1="0" x2="6" y2="0" stroke="var(--epidermal-day)" stroke-width="1"/>
+                    </g>
+                </defs>
+
+                <g stroke="var(--epidermal-stroke)" stroke-width="3">
+                    <path class="epidermal-cell" d="M -120 -60 L 200 -60 L 200 120 L -120 120 Z" />
+                    <path class="epidermal-cell" d="M 200 -60 L 520 -60 L 520 120 L 200 120 Z" />
+                    <path class="epidermal-cell" d="M -120 120 L 200 120 L 200 280 L -120 280 Z" />
+                    <path class="epidermal-cell" d="M 200 120 L 520 120 L 520 280 L 200 280 Z" />
+                    <path class="epidermal-cell" d="M -120 280 L 200 280 L 200 460 L -120 460 Z" />
+                    <path class="epidermal-cell" d="M 200 280 L 520 280 L 520 460 L 200 460 Z" />
+                </g>
+
+                <path id="stomaPore" class="stoma-pore" fill="var(--bg-day)" />
+
+                <g>
+                    <path id="leftGuard" class="guard-cell" stroke="#33691e" stroke-width="2"/>
+                    <path id="leftInnerWall" class="inner-wall" fill="none" stroke="var(--thick-wall)" stroke-width="8" stroke-linecap="round"/>
+                    <path id="leftVacuole" class="vacuole" />
+                    <use href="#chloroplast-def" class="organelle" id="lChl1" />
+                    <use href="#chloroplast-def" class="organelle" id="lChl2" />
+                    <use href="#chloroplast-def" class="organelle" id="lChl3" />
+                    <circle r="16" fill="#111" class="organelle" id="lNucleus" />
+                </g>
+
+                <g>
+                    <path id="rightGuard" class="guard-cell" stroke="#33691e" stroke-width="2"/>
+                    <path id="rightInnerWall" class="inner-wall" fill="none" stroke="var(--thick-wall)" stroke-width="8" stroke-linecap="round"/>
+                    <path id="rightVacuole" class="vacuole" />
+                    <use href="#chloroplast-def" class="organelle" id="rChl1" />
+                    <use href="#chloroplast-def" class="organelle" id="rChl2" />
+                    <use href="#chloroplast-def" class="organelle" id="rChl3" />
+                    <circle r="16" fill="#111" class="organelle" id="rNucleus" />
+                </g>
+
+                <g id="particle-pool"></g>
+
+                <g id="labels">
+                    <path d="M -20 40 L 90 60" class="dynamic-label" fill="none" stroke-width="1.5" stroke-dasharray="3,3" />
+                    <text x="-25" y="44" text-anchor="end" class="svg-label">Epidermal cell</text>
+                    
+                    <path id="lblChl" class="dynamic-label" fill="none" stroke-width="1.5" stroke-dasharray="3,3" />
+                    <text x="-25" y="109" text-anchor="end" class="svg-label">Chloroplast</text>
+                    
+                    <path id="lblVac" class="dynamic-label" fill="none" stroke-width="1.5" stroke-dasharray="3,3" />
+                    <text x="-25" y="204" text-anchor="end" class="svg-label">Vacuole</text>
+                    
+                    <path id="lblNuc" class="dynamic-label" fill="none" stroke-width="1.5" stroke-dasharray="3,3" />
+                    <text x="-25" y="344" text-anchor="end" class="svg-label">Nucleus</text>
+                    
+                    <path id="lblGuard" class="dynamic-label" fill="none" stroke-width="1.5" stroke-dasharray="3,3" />
+                    <text x="425" y="109" text-anchor="start" class="svg-label">Guard cell</text>
+                    
+                    <path id="lblWall" class="dynamic-label" fill="none" stroke-width="1.5" stroke-dasharray="3,3" />
+                    <text x="425" y="194" text-anchor="start" class="svg-label">Thickened inner</text>
+                    <text x="425" y="210" text-anchor="start" class="svg-label">cell wall</text>
+                </g>
+            </svg>
+        </div>
+
+        <div class="panel explanation">
+            <h3 id="statusTitle">Current State: Day Time (Light)</h3>
+            <div id="explanationText"></div>
+            
+            <div class="water-legend">
+                <span class="water-dot"></span> H₂O Molecules
+            </div>
+
+            <div class="gauges-wrapper">
+                <div class="gauge-container">
+                    <div class="gauge-label">
+                        <span>Guard Cell Turgor Pressure:</span>
+                        <span id="turgorStatusText">High (Turgid)</span>
+                    </div>
+                    <div class="gauge-bar-bg">
+                        <div class="turgor-fill" id="turgorBar"></div>
+                    </div>
+                </div>
+
+                <div class="gauge-container">
+                    <div class="gauge-label">
+                        <span>Size of Stoma Aperture:</span>
+                        <span id="apertureStatusText">Maximum Open</span>
+                    </div>
+                    <div class="gauge-bar-bg">
+                        <div class="aperture-fill" id="apertureBar"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const svgData = {
+            day: {
+                stomaPore: "M 185 25 C 150 25, 150 375, 185 375 L 215 375 C 250 375, 250 25, 215 25 Z",
+                leftGuard: "M 185 25 C 20 25, 20 375, 185 375 C 150 375, 150 25, 185 25 Z",
+                leftInnerWall: "M 185 25 C 150 25, 150 375, 185 375",
+                leftVacuole: "M 160 70 C 50 70, 50 330, 160 330 C 130 330, 130 70, 160 70 Z",
+                lChl1: "translate(125px, 80px) rotate(-30deg)", lChl2: "translate(75px, 200px) rotate(-90deg)", lChl3: "translate(125px, 320px) rotate(-150deg)",
+                lNucleus: "translate(150px, 345px)",
+                rightGuard: "M 215 25 C 380 25, 380 375, 215 375 C 250 375, 250 25, 215 25 Z",
+                rightInnerWall: "M 215 25 C 250 25, 250 375, 215 375",
+                rightVacuole: "M 240 70 C 350 70, 350 330, 240 330 C 270 330, 270 70, 240 70 Z",
+                rChl1: "translate(275px, 80px) rotate(30deg)", rChl2: "translate(325px, 200px) rotate(90deg)", rChl3: "translate(275px, 320px) rotate(150deg)",
+                rNucleus: "translate(250px, 345px)"
+            },
+            night: {
+                stomaPore: "M 200 25 C 190 25, 190 375, 200 375 L 200 375 C 210 375, 210 25, 200 25 Z",
+                leftGuard: "M 200 25 C 100 25, 100 375, 200 375 C 190 375, 190 25, 200 25 Z",
+                leftInnerWall: "M 200 25 C 190 25, 190 375, 200 375",
+                leftVacuole: "M 190 80 C 130 80, 130 320, 190 320 C 180 320, 180 80, 190 80 Z",
+                lChl1: "translate(165px, 90px) rotate(-10deg)", lChl2: "translate(135px, 200px) rotate(-90deg)", lChl3: "translate(165px, 310px) rotate(-170deg)",
+                lNucleus: "translate(180px, 340px)",
+                rightGuard: "M 200 25 C 300 25, 300 375, 200 375 C 210 375, 210 25, 200 25 Z",
+                rightInnerWall: "M 200 25 C 210 25, 210 375, 200 375",
+                rightVacuole: "M 210 80 C 270 80, 270 320, 210 320 C 220 320, 220 80, 210 80 Z",
+                rChl1: "translate(235px, 90px) rotate(10deg)", rChl2: "translate(265px, 200px) rotate(90deg)", rChl3: "translate(235px, 310px) rotate(170deg)",
+                rNucleus: "translate(220px, 340px)"
+            }
+        };
+
+        const labelCoords = {
+            lblChl:   { x1: -20, y1: 105, dx: 115, dy: 85,  nx: 155, ny: 95 },
+            lblVac:   { x1: -20, y1: 200, dx: 105, dy: 200, nx: 160, ny: 200 },
+            lblNuc:   { x1: -20, y1: 340, dx: 134, dy: 345, nx: 164, ny: 340 },
+            lblGuard: { x1: 420, y1: 105, dx: 310, dy: 90,  nx: 260, ny: 90 },
+            lblWall:  { x1: 420, y1: 200, dx: 250, dy: 200, nx: 210, ny: 200 } 
+        };
+
+        const explanations = {
+            day: `<div class="step"><strong>1. Solutes Accumulate:</strong> K⁺ ions are actively pumped in (and glucose is produced by photosynthesis).</div>
+                  <div class="step"><strong>2. Lower Water Potential:</strong> The <span class="highlight">water potential decreases</span> inside the guard cells.</div>
+                  <div class="step"><strong>3. Osmosis Occurs:</strong> Water enters the guard cells from neighbouring epidermal cells by osmosis.</div>
+                  <div class="step"><strong>4. Cells Become Turgid:</strong> Due to differential thickening, the thinner outer walls stretch more than the thickened inner walls, causing cells to bow outwards and open the stoma.</div>`,
+            night:`<div class="step"><strong>1. Solutes Decrease:</strong> Photosynthesis stops and K⁺ ions diffuse out of the cells.</div>
+                  <div class="step"><strong>2. Higher Water Potential:</strong> The <span class="highlight">water potential increases</span> inside the guard cells.</div>
+                  <div class="step"><strong>3. Osmosis Occurs:</strong> Water leaves the guard cells to neighbouring epidermal cells by osmosis.</div>
+                  <div class="step"><strong>4. Cells Become Flaccid:</strong> As turgor pressure drops, the elastic inner walls straighten, causing the guard cells to collapse towards each other and close the pore.</div>`
+        };
+
+        let currentMode = 'day';
+        let visualProgress = 1; 
+        let lastFrameTime = performance.now();
+        const TRANSITION_DURATION_MS = 12300; 
+
+        const MAX_PARTICLES = 120; 
+        const pool = [];
+        const poolContainer = document.getElementById('particle-pool');
+        
+        for(let i = 0; i < MAX_PARTICLES; i++) {
+            let el = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            el.setAttribute("r", "3"); 
+            el.setAttribute("fill", "var(--water-color)");
+            el.setAttribute("stroke", "#01579b");
+            el.setAttribute("stroke-width", "1.5");
+            el.setAttribute("opacity", "0"); 
+            poolContainer.appendChild(el);
+            pool.push({ el: el, active: false, progress: 0 });
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.body.className = mode;
+            
+            document.getElementById('btn-day').classList.toggle('active', mode === 'day');
+            document.getElementById('btn-night').classList.toggle('active', mode === 'night');
+            document.getElementById('statusTitle').innerText = mode === 'day' ? 'Current State: Light (Stoma Opening)' : 'Current State: Dark (Stoma Closing)';
+            document.getElementById('explanationText').innerHTML = explanations[mode];
+            document.getElementById('stomaPore').setAttribute('fill', mode === 'day' ? 'var(--bg-day)' : 'var(--bg-night)');
+
+            const elements = ['stomaPore', 'leftGuard', 'leftInnerWall', 'leftVacuole', 'rightGuard', 'rightInnerWall', 'rightVacuole'];
+            elements.forEach(id => document.getElementById(id).setAttribute('d', svgData[mode][id]));
+
+            const organelles = ['lChl1', 'lChl2', 'lChl3', 'lNucleus', 'rChl1', 'rChl2', 'rChl3', 'rNucleus'];
+            organelles.forEach(id => document.getElementById(id).style.transform = svgData[mode][id]);
+
+            document.querySelectorAll('.guard-cell').forEach(c => c.setAttribute('fill', `var(--guard-${mode})`));
+            document.querySelectorAll('.vacuole').forEach(v => v.setAttribute('fill', `var(--vacuole-${mode})`));
+            document.querySelectorAll('.epidermal-cell').forEach(c => c.setAttribute('fill', `var(--epidermal-${mode})`));
+        }
+
+        function spawnParticle(easeP) {
+            let p = pool.find(part => !part.active);
+            if (!p) return; 
+
+            let isLeft = Math.random() > 0.5;
+            let isEntering = (currentMode === 'day');
+            
+            let offsetX = (Math.random() - 0.5) * 35; 
+            let offsetY = (Math.random() - 0.5) * 140;
+
+            if (isEntering) {
+                p.startX = isLeft ? -120 + Math.random() * 80 : 440 + Math.random() * 80;
+                p.startY = -60 + Math.random() * 520;
+                p.targetX = 0; p.targetY = 0; 
+            } else {
+                let vacX = isLeft ? 160 + (100 - 160) * easeP : 240 + (300 - 240) * easeP;
+                p.startX = vacX + offsetX;
+                p.startY = 200 + offsetY;
+                p.targetX = isLeft ? -120 + Math.random() * 80 : 440 + Math.random() * 80;
+                p.targetY = -60 + Math.random() * 520;
+            }
+
+            p.isLeft = isLeft; p.offsetX = offsetX; p.offsetY = offsetY;
+            p.progress = 0; 
+            p.speed = (0.005 + Math.random() * 0.01) * (isEntering ? 0.8 : 0.4);
+            p.isEntering = isEntering;
+            p.active = true;
+        }
+
+        function animateFrame(currentTime) {
+            let deltaTime = currentTime - lastFrameTime;
+            lastFrameTime = currentTime;
+
+            let targetProgress = currentMode === 'day' ? 1 : 0;
+            let speed = deltaTime / TRANSITION_DURATION_MS; 
+            
+            if (visualProgress < targetProgress) visualProgress = Math.min(visualProgress + speed, targetProgress);
+            else if (visualProgress > targetProgress) visualProgress = Math.max(visualProgress - speed, targetProgress);
+
+            let easeP = visualProgress * visualProgress * (3 - 2 * visualProgress);
+
+            for (const [id, coords] of Object.entries(labelCoords)) {
+                let cx = coords.nx + (coords.dx - coords.nx) * easeP;
+                let cy = coords.ny + (coords.dy - coords.ny) * easeP;
+                document.getElementById(id).setAttribute('d', `M ${coords.x1} ${coords.y1} L ${cx} ${cy}`);
+            }
+            
+            let turgorPercentage = 15 + (easeP * 85); 
+            document.getElementById('turgorBar').style.width = turgorPercentage + '%';
+            
+            let turgorStatus = document.getElementById('turgorStatusText');
+            if (easeP > 0.95) { turgorStatus.innerText = "High (Turgid)"; turgorStatus.style.color = 'var(--chloroplast)'; }
+            else if (easeP < 0.05) { turgorStatus.innerText = "Low (Flaccid)"; turgorStatus.style.color = '#d32f2f'; }
+            else { turgorStatus.innerText = currentMode === 'day' ? "Increasing (Endosmosis)" : "Decreasing (Exosmosis)"; turgorStatus.style.color = '#f57c00'; }
+
+            let aperturePercentage = 5 + (easeP * 95);
+            document.getElementById('apertureBar').style.width = aperturePercentage + '%';
+
+            let apertureStatus = document.getElementById('apertureStatusText');
+            if (easeP > 0.95) { apertureStatus.innerText = "Maximum Open"; apertureStatus.style.color = '#7b1fa2'; }
+            else if (easeP < 0.05) { apertureStatus.innerText = "Closed"; apertureStatus.style.color = '#757575'; }
+            else { apertureStatus.innerText = currentMode === 'day' ? "Opening..." : "Closing..."; apertureStatus.style.color = '#ab47bc'; }
+
+            let currentLeftVacCenter = 160 + (100 - 160) * easeP;
+            let currentRightVacCenter = 240 + (300 - 240) * easeP;
+
+            for (let i = 0; i < pool.length; i++) {
+                let p = pool[i];
+                if (!p.active) continue;
+
+                p.progress += p.speed;
+                
+                if (p.progress >= 1) {
+                    p.active = false;
+                    p.el.setAttribute("opacity", "0"); 
+                } else {
+                    let travelProgress = p.progress; 
+                    
+                    if (p.isEntering) {
+                        p.targetX = (p.isLeft ? currentLeftVacCenter : currentRightVacCenter) + p.offsetX;
+                        p.targetY = 200 + p.offsetY;
+                    } 
+
+                    let currentX = p.startX + (p.targetX - p.startX) * travelProgress;
+                    let currentY = p.startY + (p.targetY - p.startY) * travelProgress;
+                    
+                    p.el.setAttribute("cx", currentX);
+                    p.el.setAttribute("cy", currentY);
+                    
+                    let opacity = 1;
+                    if (p.progress < 0.2) opacity = p.progress * 5; 
+                    if (p.progress > 0.90) opacity = (1 - p.progress) * 10; 
+                    p.el.setAttribute("opacity", opacity.toFixed(2));
+                }
+            }
+            
+            let isTransitioning = (currentMode === 'day' && visualProgress < 1) || (currentMode === 'night' && visualProgress > 0);
+            
+            if (isTransitioning) {
+                let spawnChance = currentMode === 'day' ? 0.15 + (1 - visualProgress) * 0.85 : 0.15 + visualProgress * 0.85;
+                if (Math.random() < spawnChance) spawnParticle(easeP);
+            }
+            
+            requestAnimationFrame(animateFrame);
+        }
+
+        setMode('day');
+        requestAnimationFrame((time) => { lastFrameTime = time; animateFrame(time); });
+    </script>
+</body>
+</html>
